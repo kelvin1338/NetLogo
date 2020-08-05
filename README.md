@@ -7,3 +7,5 @@ https://ccl.northwestern.edu/netlogo/6.1.1/
 
 After adjusting with the parameters, simply click "Setup Environment" and then click "Begin Simulation" to run the simulation.
 Adjust the random seed number to get slight variations using the same parameters.
+
+NetLogo-plotter.py is a preprocessing code that converts the NetLogo simulation data (from BehaviorSpace) into a pandas dataframe.
