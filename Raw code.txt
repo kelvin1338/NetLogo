@@ -14,6 +14,8 @@ humans-own [
   feel_symptoms?
   light_symptoms?
   severe_symptoms?
+  isolate_symptomatic_individuals?
+  isolation_tracker?
   age_cat
   fatality_rate
   current_infection_hours
@@ -45,6 +47,7 @@ globals [
   total_population
   mask_penetration_rate
   recorded_transmitters
+  pop_infected_daily
   current_hospital_beds_used
   sort-codes
   city-colors
@@ -61,6 +64,8 @@ to setup-agents [#total-humans #age_cat]
     set feel_symptoms? false
     set light_symptoms? false
     set severe_symptoms? false
+    set isolate_symptomatic_individuals? false
+    set isolation_tracker? false
     set intracity_travel? false
     set afford_healthcare? false
     set currently_treated? false
@@ -158,6 +163,7 @@ to setup-globals
   set current_hospital_beds_used 0
   set sort-codes n-values cities [i -> i]
   set recorded_transmitters[]
+  set pop_infected_daily[]
   set city-colors [9 8 7 6 19 18 17 16 29 28 27
     26 39 38 37 36]
 end
@@ -255,6 +261,9 @@ to go
   ask humans [move-forward-randomly]
   ask humans [infect]
   ask humans [infection_aftermath]
+
+  set pop_infected_daily lput (100 * count humans with [infected?] / total_population) pop_infected_daily
+
   if cumulative_infected = ((count humans with [not infected? and infected_previously?]) + cumulative_death) [
     stop
   ]
@@ -262,12 +271,40 @@ to go
 end
 
 
-
 to move-forward-randomly ;now we have: essential_worker, intracity_travel,
+  let lockdown_delay_hours lockdown_delay * 24
+
   ifelse (not feel_symptoms?) [ ;people only move if no symptoms
     ifelse Total_lockdown? [ ;if no symptoms and total lockdown, don't move, except for the ones disobeying and essential workers
 
-      ifelse intracity_travel? [ ;intracity travellers move quicker, but does not leave the vicinity of the city
+      ifelse ticks > lockdown_delay_hours [
+
+        ifelse intracity_travel? [ ;intracity travellers move quicker, but does not leave the vicinity of the city
+
+          ifelse essential_worker? [ ;essential worker + intracity travaller -> essential worker overrides
+            ifelse coin-flip? [right random 45] [left random 45]
+            forward random-float 0.2]
+          [;intracity traveller + not essential worker -> moves around quickly but only within the city
+            ifelse coin-flip? [right random 45] [left random 45]
+            forward random-float 0.2
+            if confine_city_travel? [
+              if city != [city] of home_patch [face home_patch forward 1]
+            ]
+          ]
+        ]
+        [;if not an intracity traveller...
+          ifelse essential_worker? [ ;if not intracity traveller but essential worker...move around quickly regardless of city confine
+            ifelse coin-flip? [right random 45] [left random 45]
+            forward random-float 0.2]
+          [;if not an essential worker nor intracity traveller, under total lockdown, dont move
+          ]
+        ]
+      ]
+
+      [
+
+
+        ifelse intracity_travel? [ ;intracity travellers move quicker, but does not leave the vicinity of the city
 
         ifelse essential_worker? [ ;essential worker + intracity travaller -> essential worker overrides
           ifelse coin-flip? [right random 45] [left random 45]
@@ -279,15 +316,20 @@ to move-forward-randomly ;now we have: essential_worker, intracity_travel,
             if city != [city] of home_patch [face home_patch forward 1]
           ]
         ]
-      ]
-      [;if not an intracity traveller...
-        ifelse essential_worker? [ ;if not intracity traveller but essential worker...move around quickly regardless of city confine
-          ifelse coin-flip? [right random 45] [left random 45]
-          forward random-float 0.2]
-        [;if not an essential worker nor intracity traveller, under total lockdown, dont move
+        ]
+        [;if not an intracity traveller
+          ifelse essential_worker? [ ;if not intracity traveller but essential worker...move around quickly regardless of city confine
+            ifelse coin-flip? [right random 45] [left random 45]
+            forward random-float 0.2]
+          [ ;if not intracity traveller nor essential worker under no total lockdown
+            ifelse coin-flip? [right random 180] [left random 180]
+            forward random-float 0.2
+            if confine_city_travel? [
+              if city != [city] of home_patch [face home_patch forward 1]
+            ]
+          ]
         ]
       ]
-
     ]
     [ ;if there is no total lockdown...
       ifelse intracity_travel? [ ;intracity travellers move quicker, but does not leave the vicinity of the city
@@ -381,9 +423,9 @@ to get-infected
   set infected? true
   set contagious? true
   set color yellow
-  set infection-duration 24 * (random-normal infection_duration_avg 4.0) ;avg hours of infection
-  set serious_symptoms_day round (infection-duration) - 1 ;serious symptom may show after 1st week
-  set symptom_delay_duration 24 * (random-normal days_before_symptom_showing 3.5) ;duration (converted to ticks or hours) before symptoms show
+  set infection-duration 24 * (random-normal infection_duration_avg 2) ;avg hours of infection
+  set serious_symptoms_day round infection-duration - 1 ;serious symptom may show after 1st week
+  set symptom_delay_duration 24 * (random-normal days_before_symptom_showing 1) ;duration (converted to ticks or hours) before symptoms show
   set current_infection_hours 0
   set cumulative_infected cumulative_infected + 1
 end
@@ -446,11 +488,19 @@ to infection_aftermath
         [
           set light_symptoms? true ;people with light symptoms will not die. they will remain orange-faced
         ]
+        ;possibly get critically ill
+
+        ;Put slider bar here for isolation
+        if (symptomatic_isolation_rate >= (random(100) + 1)) and (not isolation_tracker?) [
+        set isolate_symptomatic_individuals? true
+        ]
+      set isolation_tracker? true ;isolation_tracker is just a variable to make sure this coin-flip is only applied once (and no more) to each symptomatic individual
       ]
-      ;possibly_get_critically_ill
+
       if afford_healthcare? and severe_symptoms? and (not currently_treated?) [ ;only severely ill who can afford healthcare is hospitalised
         hospital_treatment
       ]
+
     ]
     if isolate_symptomatic_individuals? [
       if feel_symptoms? [
@@ -468,17 +518,9 @@ to infection_aftermath
 
     ifelse (current_infection_hours >= infection-duration)
     [
-     set current_infection_hours 0
-     recover
-    ]
-    [
-      set current_infection_hours current_infection_hours + 1
-    ]
 
-    if severe_symptoms? [
-      if (current_infection_hours = serious_symptoms_day) [
-        if (fatality_rate >= (random (100) + 1)) [
-          ;update-death-statistics age-group
+      ifelse severe_symptoms? [ ;if severe symptoms...
+        ifelse (fatality_rate >= (random (100) + 1)) [ ;...flip a coin, if dead....
           if currently_treated? [
             set currently_treated? false
             set current_hospital_beds_used current_hospital_beds_used - 1
@@ -489,9 +531,22 @@ to infection_aftermath
           set size 1
           set color red
         ]
+        [ ;if not dead...recover
+          set current_infection_hours 0
+          recover
+        ]
+      ]
+
+      [ ;if light symptoms, recover at end of period
+      set current_infection_hours 0
+      recover
       ]
     ]
+    [
+      set current_infection_hours current_infection_hours + 1
+    ]
   ]
+
 end
 
 
