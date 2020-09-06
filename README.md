@@ -21,7 +21,7 @@ netlogo_to_python_analysis.py is a preprocessing code that converts the NetLogo 
 -Read the results in Python using the file 'netlogo_to_python_analysis.py' and analyse the results using required sections of the code <br/>
 
 
-**How to generate simulation results resembling the UK, Hong Kong and Italy** <br/>
+**Generating simulation results resembling the UK, Hong Kong and Italy** <br/>
 -Open the 'Validation folder' in the GitHub repository <br/>
 -Download parameters_to_observe.txt <br/>
 -Open the country of interest <br/>
