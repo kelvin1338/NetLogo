@@ -1,0 +1,555 @@
+breed [humans human]
+breed [dead dead_singular]
+
+humans-own [
+  infected?
+  contagious?
+  infected_previously?
+  wearmask?
+  intracity_travel?
+  essential_worker?
+  infection-duration
+  symptom_delay_duration
+  serious_symptoms_day
+  feel_symptoms?
+  light_symptoms?
+  severe_symptoms?
+  isolate_symptomatic_individuals?
+  isolation_tracker?
+  age_cat
+  fatality_rate
+  current_infection_hours
+  afford_healthcare?
+  currently_treated?
+  hospitalisation_rate
+  home_patch
+  current_city
+  initial_city
+]
+
+patches-own [
+  city ; city code of patch
+]
+
+
+globals [
+  age_cat_0-9
+  age_cat_10-19
+  age_cat_20-29
+  age_cat_30-39
+  age_cat_40-49
+  age_cat_50-59
+  age_cat_60-69
+  age_cat_70-79
+  age_cat_80+
+  cumulative_infected
+  cumulative_death
+  total_population
+  mask_penetration_rate
+  recorded_transmitters
+  pop_infected_daily
+  current_hospital_beds_used
+  sort-codes
+  city-colors
+]
+
+
+to setup-agents [#total-humans #age_cat]
+  create-humans #total-humans [
+    set infected? false
+    set contagious? false
+    set essential_worker? false
+    set infected_previously? false
+    set wearmask? false
+    set feel_symptoms? false
+    set light_symptoms? false
+    set severe_symptoms? false
+    set isolate_symptomatic_individuals? false
+    set isolation_tracker? false
+    set intracity_travel? false
+    set afford_healthcare? false
+    set currently_treated? false
+    setxy random-xcor random-ycor
+    set home_patch patch-here
+    set age_cat #age_cat
+    set initial_city city ;this information is the same from the very start and does not update
+    set current_city city ;this is more like initial_city
+
+    ifelse age_cat <= age_cat_0-9 [
+      set fatality_rate fatality_rate_0-9
+      set hospitalisation_rate critically_ill_0-9
+      set color green
+    ]
+    [
+      ifelse age_cat <= age_cat_10-19 [
+        set fatality_rate fatality_rate_10-19
+        set hospitalisation_rate critically_ill_10-19
+        set color green + 0.35
+      ]
+      [
+        ifelse age_cat <= age_cat_20-29 [
+          set fatality_rate fatality_rate_20-29
+          set hospitalisation_rate critically_ill_20-29
+          set color green + (0.35 * 2)
+        ]
+        [
+          ifelse age_cat <= age_cat_30-39 [
+            set fatality_rate fatality_rate_30-39
+            set hospitalisation_rate critically_ill_30-39
+            set color green + (0.35 * 3)
+          ]
+          [
+            ifelse age_cat <= age_cat_40-49 [
+              set fatality_rate fatality_rate_40-49
+              set hospitalisation_rate critically_ill_40-49
+              set color green + (0.35 * 4)
+            ]
+            [
+              ifelse age_cat <= age_cat_50-59 [
+                set fatality_rate fatality_rate_50-59
+                set hospitalisation_rate critically_ill_50-59
+                set color green + (0.35 * 5)
+              ]
+              [
+                ifelse age_cat <= age_cat_60-69 [
+                  set fatality_rate fatality_rate_60-69
+                  set hospitalisation_rate critically_ill_60-69
+                  set color green + (0.35 * 6)
+                ]
+                [
+                  ifelse age_cat <= age_cat_70-79 [
+                    set fatality_rate fatality_rate_70-79
+                    set hospitalisation_rate critically_ill_70-79
+                    set color green + (0.35 * 7)
+                  ]
+                  [
+                      set fatality_rate fatality_rate_80+
+                      set hospitalisation_rate critically_ill_80+
+                      set color green + (0.35 * 8)
+                  ]
+                ]
+              ]
+            ]
+          ]
+        ]
+
+      ]
+    ]
+  ]
+
+  ask humans [
+    set shape "face happy"
+    set size 1
+  ]
+
+end
+
+
+
+to setup-globals
+  random-seed random_seed_number
+  set age_cat_0-9 5
+  set age_cat_10-19 15
+  set age_cat_20-29 25
+  set age_cat_30-39 35
+  set age_cat_40-49 45
+  set age_cat_50-59 55
+  set age_cat_60-69 65
+  set age_cat_70-79 75
+  set age_cat_80+ 85
+  set cumulative_infected 0
+  set cumulative_death 0
+  set mask_penetration_rate (mask_penetration_particles / 100)
+  set current_hospital_beds_used 0
+  set sort-codes n-values cities [i -> i]
+  set recorded_transmitters[]
+  set pop_infected_daily[]
+  set city-colors [9 8 7 6 19 18 17 16 29 28 27
+    26 39 38 37 36]
+end
+
+to setup-city
+  let step world-width / sqrt cities
+  ask patches [
+    let units int ((pxcor + max-pxcor) / step)
+    let tens int ((pycor + max-pycor) / step)
+    set city 10 * tens + units
+  ]
+
+  let aux-codes sort remove-duplicates [city] of patches
+  (foreach aux-codes sort-codes [ [old new] -> ask patches with [city = old] [set city new ] ])
+  ask patches [ set pcolor (item city city-colors)]
+end
+
+
+to setup
+  clear-all
+  setup-globals
+  setup-city
+  setup-agents pop_0-9 age_cat_0-9
+  setup-agents pop_10-19 age_cat_10-19
+  setup-agents pop_20-29 age_cat_20-29
+  setup-agents pop_30-39 age_cat_30-39
+  setup-agents pop_40-49 age_cat_40-49
+  setup-agents pop_50-59 age_cat_50-59
+  setup-agents pop_60-69 age_cat_60-69
+  setup-agents pop_70-79 age_cat_70-79
+  setup-agents pop_80+ age_cat_80+
+  setup-weather_effect
+  set total_population (count humans + count dead)
+  let initial_infected_humans round (count humans * (initial_infected_proportion / 100)) ;true number of initial infected humans
+  infect_people initial_infected_humans ;start off by having some infected people
+
+  let initial_wear_mask round (count humans * (use_mask_pop / 100))
+  wear_mask initial_wear_mask
+
+  let initial_intracity_traveller round (count humans * (Intracity_traveller / 100))
+  intra_city_travel initial_intracity_traveller
+
+  let initial_essential_worker round (count humans * (Essential_workers / 100))
+  essential_worker initial_essential_worker
+
+  let initial_afford_healthcare round (count humans * (Afford_healthcare / 100))
+  Affordable_healthcare initial_afford_healthcare
+
+  reset-ticks
+end
+
+to setup-weather_effect
+  if Weather_conditions = "Cold + Dry" [
+    set infectivity infectivity
+  ]
+
+  if Weather_conditions = "Cold + Humid" [
+    set infectivity (0.97 * infectivity)
+  ]
+
+  if Weather_conditions = "Hot + Dry" [
+    set infectivity (0.95 * infectivity)
+  ]
+
+  if Weather_conditions = "Hot + Humid" [
+    set infectivity (0.9 * infectivity)
+  ]
+end
+
+
+to infect_people [#initial_infected_humans]
+  ask n-of #initial_infected_humans humans with [not infected_previously?] [get-infected]
+end
+
+to wear_mask [#initial_wear_mask]
+  ask n-of #initial_wear_mask humans [set wearmask? true]
+  ask humans with [wearmask?] [set shape "circle"]
+end
+
+to intra_city_travel [#initial_intracity_traveller]
+  ask n-of #initial_intracity_traveller humans [set intracity_travel? true]
+end
+
+to affordable_healthcare [#initial_afford_healthcare]
+  ask n-of #initial_afford_healthcare humans [set afford_healthcare? true]
+end
+
+to essential_worker [#initial_essential_worker]
+  ask n-of #initial_essential_worker humans [set essential_worker? true]
+end
+
+
+to go
+  ask humans [set current_city city]
+  ask humans [move-forward-randomly]
+  ask humans [infect]
+  ask humans [infection_aftermath]
+
+  set pop_infected_daily lput (100 * count humans with [infected?] / total_population) pop_infected_daily
+
+  if cumulative_infected = ((count humans with [not infected? and infected_previously?]) + cumulative_death) [
+    stop
+  ]
+    tick
+end
+
+
+to move-forward-randomly ;now we have: essential_worker, intracity_travel,
+  let lockdown_delay_hours lockdown_delay * 24
+
+  ifelse (not feel_symptoms?) [ ;people only move if no symptoms
+    ifelse Total_lockdown? [ ;if no symptoms and total lockdown, don't move, except for the ones disobeying and essential workers
+
+      ifelse ticks > lockdown_delay_hours [
+
+        ifelse intracity_travel? [ ;intracity travellers do not not leave the vicinity of the city
+
+          ifelse essential_worker? [ ;essential worker + intracity travaller -> essential worker overrides
+            ifelse coin-flip? [right random 45] [left random 45]
+            forward random-float 0.2]
+          [;intracity traveller + not essential worker -> moves around quickly but only within the city
+            ifelse coin-flip? [right random 180] [left random 180]
+            forward random-float 0.2
+            if confine_city_travel? [
+              if city != [city] of home_patch [face home_patch forward 1]
+            ]
+          ]
+        ]
+        [;if not an intracity traveller...
+          ifelse essential_worker? [ ;if not intracity traveller but essential worker...move around quickly regardless of city confine
+            ifelse coin-flip? [right random 45] [left random 45]
+            forward random-float 0.2]
+          [;if not an essential worker nor intracity traveller, under total lockdown, dont move
+          ]
+        ]
+      ]
+
+      [
+
+
+        ifelse intracity_travel? [ ;intracity travellers move quicker, but does not leave the vicinity of the city
+
+        ifelse essential_worker? [ ;essential worker + intracity travaller -> essential worker overrides
+          ifelse coin-flip? [right random 45] [left random 45]
+          forward random-float 0.2]
+        [;intracity traveller + not essential worker -> moves around quickly but only within the city
+          ifelse coin-flip? [right random 180] [left random 180]
+          forward random-float 0.2
+          if confine_city_travel? [
+            if city != [city] of home_patch [face home_patch forward 1]
+          ]
+        ]
+        ]
+        [;if not an intracity traveller
+          ifelse essential_worker? [ ;if not intracity traveller but essential worker...move around quickly regardless of city confine
+            ifelse coin-flip? [right random 45] [left random 45]
+            forward random-float 0.2]
+          [ ;if not intracity traveller nor essential worker under no total lockdown
+            ifelse coin-flip? [right random 180] [left random 180]
+            forward random-float 0.2
+            if confine_city_travel? [
+              if city != [city] of home_patch [face home_patch forward 1]
+            ]
+          ]
+        ]
+      ]
+    ]
+    [ ;if there is no total lockdown...
+      ifelse intracity_travel? [ ;intracity travellers move quicker, but does not leave the vicinity of the city
+
+        ifelse essential_worker? [ ;essential worker + intracity travaller -> essential worker overrides
+          ifelse coin-flip? [right random 45] [left random 45]
+          forward random-float 0.2]
+        [;intracity traveller + not essential worker -> moves around the city
+          ifelse coin-flip? [right random 180] [left random 180]
+          forward random-float 0.2
+          if confine_city_travel? [
+            if city != [city] of home_patch [face home_patch forward 1]
+          ]
+        ]
+      ]
+      [;if not an intracity traveller
+        ifelse essential_worker? [ ;if not intracity traveller but essential worker...move around quickly regardless of city confine
+          ifelse coin-flip? [right random 45] [left random 45]
+          forward random-float 0.2]
+        [ ;if not intracity traveller nor essential worker under no total lockdown
+          ifelse coin-flip? [right random 180] [left random 180]
+          forward random-float 0.2
+          if confine_city_travel? [
+            if city != [city] of home_patch [face home_patch forward 1]
+          ]
+        ]
+      ]
+    ]
+  ]
+  [ ;if they feel symptoms, stop moving, i.e. no command.
+  ]
+end
+
+
+to infect
+  if (not infected_previously?) [ ;only applies to people not infected and both stay in same city
+    let city_of_self nobody
+    set city_of_self current_city
+    let people_around humans-on neighbors ;let "people_around" be the neighbors
+    ifelse (not wearmask?) ;referring to the person ITSELF
+    [let infectious_around people_around with [(infected? = true and contagious? = true and current_city = city_of_self)] ;people are infectious if they are infected + contagious
+     let infectious_around_mask infectious_around with [wearmask?]
+     let infectious_around_nomask infectious_around with [not wearmask?]
+     let number_of_infectious_around count infectious_around
+     let number_of_infectious_around_nomask count infectious_around_nomask
+     let number_of_infectious_around_mask count infectious_around_mask
+
+     if number_of_infectious_around > 0 [ ;if there are infected no-mask people around
+       let within_infectious_distance (random(metres_per_patch) + 1) ;define infectious distance
+       set within_infectious_distance within_infectious_distance + random-float ( social_distancing_metres )
+       ifelse (not wearmask?) [ ;referring to neighbours without masks
+         if (infectivity >= (random(100) + 1)) and within_infectious_distance <= maximum_infectious_distance [
+           get-infected
+         ]
+       ]
+       [
+         if (mask_penetration_rate * infectivity >= (random(100) + 1)) and within_infectious_distance <= maximum_infectious_distance [  ;infected according to infectivity + within distance
+           get-infected
+         ]
+       ]
+      ]
+    ]
+
+    [let infectious_around people_around with [(infected? = true and contagious? = true and current_city = city_of_self)]
+     let infectious_around_mask infectious_around with [wearmask?]
+     let infectious_around_nomask infectious_around with [not wearmask?]
+     let number_of_infectious_around count infectious_around
+     let number_of_infectious_around_nomask count infectious_around_nomask
+     let number_of_infectious_around_mask count infectious_around_mask
+     if number_of_infectious_around > 0 [ ;if there are infected people around
+       let within_infectious_distance (random(metres_per_patch) + 1) ;define infectious distance
+       set within_infectious_distance within_infectious_distance + random-float ( social_distancing_metres )
+       ifelse (not wearmask?) [
+          if ((mask_penetration_rate) * infectivity >= (random(100) + 1)) and within_infectious_distance <= maximum_infectious_distance [   ;same principle as above but we multiply by penetration rate because victim is already wearing mask
+            get-infected
+          ]
+       ]
+       [
+          if ((mask_penetration_rate) * (mask_penetration_rate) * infectivity >= (random(100) + 1)) and within_infectious_distance <= maximum_infectious_distance [   ;infected according to infectivity + within distance
+            get-infected
+          ] ;we multiply by mask penetration rate twice because victim and infector is wearing mask; therefore two layers of masks
+       ]
+     ]
+    ]
+  ]
+end
+
+
+to get-infected
+  set infected_previously? true
+  set infected? true
+  set contagious? true
+  set color yellow
+  set infection-duration 24 * (random-normal infection_duration_avg 2) ;avg hours of infection
+  set serious_symptoms_day round infection-duration - 1 ;serious symptom may show after 1st week
+  set symptom_delay_duration 24 * (random-normal days_before_symptom_showing 1) ;duration (converted to ticks or hours) before symptoms show
+  set current_infection_hours 0
+  set cumulative_infected cumulative_infected + 1
+end
+
+to hospital_treatment
+  let total_hospital_beds hospital_beds
+  if current_hospital_beds_used <= total_hospital_beds - 1 [
+    set currently_treated? true
+    if currently_treated? [
+      ;set size 4
+      set contagious? false
+      set infection-duration (0.8 * infection-duration) ;0.8x duration time
+      set fatality_rate (0.25 * fatality_rate) ;0.25x fatality rate whilst treated
+      set current_hospital_beds_used current_hospital_beds_used + 1
+    ]
+  ]
+end
+
+
+to recover
+  set infected? false
+  set feel_symptoms? false
+  set light_symptoms? false
+  set severe_symptoms? false
+  set contagious? false
+  set infection-duration 0
+  set serious_symptoms_day 0
+  set current_infection_hours 0
+  if currently_treated? [
+    set currently_treated? false
+    set current_hospital_beds_used current_hospital_beds_used - 1
+  ]
+  set color turquoise
+  set shape "face happy"
+  set size 1
+
+end
+
+
+to infection_aftermath
+  if infected? [
+    if (current_infection_hours >= symptom_delay_duration) [
+      set feel_symptoms? true
+
+      if feel_symptoms? [
+        ifelse severe_symptoms? [
+          set color 13
+          set shape "face sad"
+        ]
+        [
+          set color orange
+          set shape "face sad"
+        ]
+      ]
+
+      if feel_symptoms? and (not severe_symptoms?) and (not light_symptoms?) [
+        ifelse (hospitalisation_rate >= (random(100) + 1)) [
+          set severe_symptoms? true
+        ]
+        [
+          set light_symptoms? true ;people with light symptoms will not die. they will remain orange-faced
+        ]
+        ;possibly get critically ill
+
+        ;Put slider bar here for isolation
+        if (symptomatic_isolation_rate >= (random(100) + 1)) and (not isolation_tracker?) [
+        set isolate_symptomatic_individuals? true
+        ]
+      set isolation_tracker? true ;isolation_tracker is just a variable to make sure this coin-flip is only applied once (and no more) to each symptomatic individual
+      ]
+
+      if afford_healthcare? and severe_symptoms? and (not currently_treated?) [ ;only severely ill who can afford healthcare is hospitalised
+        hospital_treatment
+      ]
+
+    ]
+    if isolate_symptomatic_individuals? [
+      if feel_symptoms? [
+        set contagious? false
+        set shape "house"
+      ]
+    ]
+
+    if currently_treated? [
+      set shape "ambulance"
+      set color white
+      set size 4
+    ]
+
+
+    ifelse (current_infection_hours >= infection-duration)
+    [
+
+      ifelse severe_symptoms? [ ;if severe symptoms...
+        ifelse (fatality_rate >= (random (100) + 1)) [ ;...flip a coin, if dead....
+          if currently_treated? [
+            set currently_treated? false
+            set current_hospital_beds_used current_hospital_beds_used - 1
+          ]
+          set cumulative_death cumulative_death + 1
+          set breed dead
+          set shape "x"
+          set size 1
+          set color red
+        ]
+        [ ;if not dead...recover
+          set current_infection_hours 0
+          recover
+        ]
+      ]
+
+      [ ;if light symptoms, recover at end of period
+      set current_infection_hours 0
+      recover
+      ]
+    ]
+    [
+      set current_infection_hours current_infection_hours + 1
+    ]
+  ]
+
+end
+
+
+to-report coin-flip?
+  report random 2 = 0 ;reports outcome of 0 or 1, if 0 then its true
+end
