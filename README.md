@@ -4,8 +4,10 @@ COVID-19 Agent-based Simulation
 To run the model above, please download Dissertation.nlogo and the software NetLogo 6.1.1 using the following link (Approximately 200MB):
 https://ccl.northwestern.edu/netlogo/6.1.1/
 
-Adjust parameters if necessary, then simply click "Setup Environment" followed by "Begin Simulation" to run the simulation.
-Adjust the random seed number to get slight variations using the same parameters.
+Adjust parameters if necessary, then simply click "Setup Environment" followed by "Begin Simulation" to run the simulation. <br/>
+Adjust the random seed number to get slight variations using the same parameters. <br/>
+Note that by default, the simulation space is 30 x 30 and the population is approximately 1000. However, almost all of the verification and validation experiments in the dissertation report are performed on a population size of 10000 and a simulation space of 100 x 100. However, a simulation space of 30 x 30 and population size of 1000 is sufficient to generate quick and interpretable results. Although a population size of 10000 and larger simulation space is less prone to anomalies, it takes a much longer time to finish running the simulation. <br/> 
+The simulation space can be adjusted by right clicking the simulation animation space and setting 'max-pxcor' and 'max-pycor' both to 100, and the population size can be adjusted by right clicking the population slider bars and clicking 'Edit' to manually specify numbers. <br/>
 
 netlogo_to_python_analysis.py is a preprocessing code that converts the NetLogo simulation results (from BehaviorSpace) into a pandas dataframe. It then contains various functions for graph-plotting, as well functions for generating and analysing Elementary Effects Method (EEM) trajectories.
 
