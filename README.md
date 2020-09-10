@@ -19,6 +19,7 @@ netlogo_to_python_analysis.py is a preprocessing code that converts the NetLogo 
 **Performing sensitivity analysis** <br/>
 -Vary the parameter(s) of interest using BehaviorSpace, i.e. ["social_distancing_metres" 0 0.5 1 1.5 2] <br/>
 -Read the results in Python using the file 'netlogo_to_python_analysis.py' and analyse the results using required sections of the code <br/>
+-**Note:** Lines 256-342 of 'netlogo_to_python_analysis.py' is the python code for the Morris Elementary Effects Analysis for NetLogo. To run this section, the user must download the file __init__.py in the repository add it to their 'morris' folder which can be found in 'environment path + \Lib\site-packages\SALib\sample\'. More specifically, replace the existing '__init__.py' already in the corresponding file with the above new file. The reason for this is because the modified file has a parameter called 'grid_jump' which allows the user to specify 'delta' and also set random seed numbers to obtain reproducible results. <br/>
 
 
 **Generating simulation results resembling the UK, Hong Kong and Italy** <br/>
